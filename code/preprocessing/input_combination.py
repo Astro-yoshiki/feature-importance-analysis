@@ -6,7 +6,7 @@ import numpy as np
 import itertools
 
 # データの読み込み
-datapath = "../../data/"
+datapath = "../../data/processed_data/"
 df_master = pd.read_csv(os.path.join(datapath, "master_data.csv"))
 lis = df_master.columns[:-2].to_list() # カラム名の抽出
 
