@@ -14,9 +14,6 @@ from sklearn.preprocessing import StandardScaler
 
 data_path = "../data/processed_data/master_data.csv"
 cond_path = "../data/processed_data/input_combination.csv"
-model_save_path = "../model/length/"
-if not os.path.exists(model_save_path):
-    os.mkdir(model_save_path)
 
 
 def rmse_score(y_true, y_pred):
@@ -34,13 +31,21 @@ def choose_input(model_id, path=cond_path):  # kwargは後に置く
     return ind_not_zero.to_list()
 
 
-def main(conds_, model_id, result_, path=data_path):
+def main(conds_, model_id, result_, path=data_path, label_=None):
+    model_save_path = "../model/{0}/".format(str(label_))
+    if not os.path.exists(model_save_path):
+        os.mkdir(model_save_path)
+
     # データの読み込み
     df = pd.read_csv(path)
     x = pd.DataFrame(np.zeros((len(df), len(conds_))), columns=conds_)
     for cond in conds_:
         x[cond] = df[cond].values
-    y = df.iloc[:, [-2]].values
+    if label_ == "length":
+        y = df.iloc[:, [-2]].values
+    elif label_ == "width":
+        y = df.iloc[:, [-1]].values
+
     # 正規化
     x_stdsc = StandardScaler()
     y_stdsc = StandardScaler()
@@ -49,8 +54,7 @@ def main(conds_, model_id, result_, path=data_path):
 
     # グリッドサーチの設定
     param_grid = {"max_depth": [4, 6],
-                  "learning_rate":  [0.01, 0.05, 0.1],
-                  'min_samples_leaf': [3, 5, 9, 17]
+                  "learning_rate":  [0.01, 0.02, 0.05, 0.1]
                   }
     score_funcs = {
         "rmse": make_scorer(rmse_score, greater_is_better=False)
@@ -59,8 +63,8 @@ def main(conds_, model_id, result_, path=data_path):
 
     # グリッドサーチによるハイパーパラメータ探索
     model = xgb.XGBRegressor(n_estimators=1000)
-    model_cv = GridSearchCV(model, param_grid, iid=True, cv=kf, scoring=score_funcs["rmse"],
-                            refit=False, n_jobs=-1, verbose=0)
+    model_cv = GridSearchCV(model, param_grid, iid=True, cv=kf, refit=False,
+                            scoring=score_funcs["rmse"], n_jobs=-1, verbose=0)
     model_cv.fit(x_std, y_std)
 
     # RMSEの抽出
@@ -73,7 +77,7 @@ def main(conds_, model_id, result_, path=data_path):
     model = xgb.XGBRegressor(**model_cv.best_params_)
     model.fit(x_std, y_std)
     # save model to file
-    pickle.dump(model, open(model_save_path + "xgb_model_length_" + str(model_id) + ".pickle", "wb"))
+    pickle.dump(model, open("{0}xgb_model_{1}_{2}.pickle".format(model_save_path, str(label_), str(model_id)), "wb"))
 
     """
     # load model from file
@@ -84,20 +88,20 @@ def main(conds_, model_id, result_, path=data_path):
 if __name__ == "__main__":
     df_result = pd.read_csv(cond_path)
     result = []
-    # TODO: len(df_result)に変更
-    num = 10
+    num = 10  # TODO: len(df_result)に変更
+    label = "length"  # TODO: widthの場合は、「label = "width"」に変更
     start_time = time.time()
 
     # モデル評価開始
     for i in range(num):
         conds = choose_input(i, cond_path)
-        main(conds, i, result_=result, path=data_path)
+        main(conds, i, result_=result, path=data_path, label_=label)
         if i % 1000 == 0 and i != 0:
             print("{}th Modeling Finished!".format(i))
         if i == len(df_result) - 1:
             print("Modeling Completed!")
     df_result.iloc[:num, -1] = result
-    df_result.to_csv("../data/processed_data/variable_selection_length.csv", encoding="utf-8")
+    df_result.to_csv("../data/processed_data/variable_selection_{0}.csv".format(str(label)), encoding="utf-8")
 
     end_time = time.time()
     elapsed_time = end_time - start_time

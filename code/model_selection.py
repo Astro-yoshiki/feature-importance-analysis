@@ -56,12 +56,12 @@ class ModelSelection:
         """Cross Validationによるモデルの性能検証を行う関数"""
         kf = KFold(n_splits=7, shuffle=True, random_state=0)
         score_funcs = {
-            "rmse": make_scorer(self.rmse_score)
+            "rmse": make_scorer(self.rmse_score, greater_is_better=False)
         }
 
         scores = cross_validate(model_, self.x_std, self.y_std, cv=kf, scoring=score_funcs)
         mean_rmse = scores["test_rmse"].mean()
-        return mean_rmse
+        return mean_rmse * (-1)
 
     def gaussian_process(self) -> object:
         """ガウス過程回帰を行う関数 """
@@ -83,47 +83,57 @@ class ModelSelection:
     def visualization(self, model_, method=None) -> None:
         """予測結果の可視化を行う関数"""
         # ガウス過程回帰の場合は分散も可視化するため, 処理を分けている
-        # TODO: 横軸をDayにする必要はない. parity-plotに変更すること(GPRの分岐は要るか...)
-        # TODO: それぞれの手法の予測結果をsubplotでまとめて表示したい
-        # TODO: アンサンブル予測結果を示したい
-
         if method == "GPR":
             y_pred_std, y_var_std = model_.predict(self.x_std, return_std=True)
             y_pred = self.y_sc.inverse_transform(y_pred_std)
             y_var = y_var_std * self.y_sc.scale_
             y_std = y_var ** 0.5
-            day_total = np.linspace(1, len(y_pred), len(y_pred))
 
-            fig, ax = plt.subplots(figsize=(10, 5))
-            ax.scatter(day_total, self.y, c="b", label="raw data")
-            ax.plot(day_total, y_pred, "r", label="prediction")
-            ax.fill_between(day_total, y_pred.reshape(-1) - y_std, y_pred.reshape(-1) + y_std,
+            fig, ax = plt.subplots(figsize=(5, 5))
+            ax.plot(self.y, y_pred, "bo")
+            ax.plot([min(self.y), max(self.y)], [min(self.y), max(self.y)], color="r")
+            ax.fill_between(self.y, y_pred.reshape(-1) - y_std, y_pred.reshape(-1) + y_std,
                             alpha=0.3, color="steelblue", label="1σ")
-            ax.set_xlabel("Day")
-            ax.set_ylabel("Length")
+            ax.set_xlabel("Actual")
+            ax.set_ylabel("Prediction")
+            ax.set_title(method)
+            ax.legend(loc="best")
+        elif method == "Ensemble":
+            y_pred = np.zeros((len(model_), len(self.y)))
+            for i in range(len(model_)):
+                y_pred_std = model_[i].predict(self.x_std)
+                y_pred[i] = self.y_sc.inverse_transform(y_pred_std)
+            y_pred_mean = np.mean(y_pred, axis=0)
+            print(y_pred_mean.shape)
+
+            fig, ax = plt.subplots(figsize=(5, 5))
+            ax.plot(self.y, y_pred_mean, "bo")
+            ax.plot([min(self.y), max(self.y)], [min(self.y), max(self.y)], color="r")
+            ax.set_xlabel("Actual")
+            ax.set_ylabel("Prediction")
             ax.set_title(method)
             ax.legend(loc="best")
         else:
             y_pred_std = model_.predict(self.x_std)
             y_pred = self.y_sc.inverse_transform(y_pred_std)
-            day_total = np.linspace(1, len(y_pred), len(y_pred))
 
-            fig, ax = plt.subplots(figsize=(10, 5))
-            ax.scatter(day_total, self.y, c="b", label="raw data")
-            ax.plot(day_total, y_pred, "r", label="prediction")
-            ax.set_xlabel("Day")
-            ax.set_ylabel("Length")
+            fig, ax = plt.subplots(figsize=(5, 5))
+            ax.plot(self.y, y_pred, "bo")
+            ax.plot([min(self.y), max(self.y)], [min(self.y), max(self.y)], color="r")
+            ax.set_xlabel("Actual")
+            ax.set_ylabel("Prediction")
             ax.set_title(method)
             ax.legend(loc="best")
 
         # show plots
         fig.tight_layout()
-        # plt.savefig("result/" + str(method) + ".png", dpi=100)
+        plt.savefig("../figure/prediction_{0}.png".format(str(method)), dpi=100)
         plt.show()
 
 
 if __name__ == "__main__":
-    path = "../../../data/processed_data/master_data_length.csv"
+    # TODO: 変数選択したファイルの指定
+    path = "../data/processed_data/master_data_length.csv"
 
     # ガウス過程回帰
     kernel = C(1.0, (1e-2, 1e2)) * RBF(1.0, (1e-2, 1e2)) + Wh(0.01, (1e-2, 1e2))
@@ -144,3 +154,8 @@ if __name__ == "__main__":
     result, ga2m = ms.ga2m()
     print("RMSE: ", result)
     # ms.visualization(model_=ga2m, method="GA2M")
+
+    # アンサンブル
+    ms = ModelSelection(path, kernel_=None)
+    model = [gp, gbdt, ga2m]
+    # ms.visualization(model_=model, method="Ensemble")
