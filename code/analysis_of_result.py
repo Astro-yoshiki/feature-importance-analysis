@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -17,7 +19,7 @@ plt.rcParams["grid.linewidth"] = 0.3
 
 
 def plot_sorted_bar(figsize: tuple, x: list, y: np.array, xticks_rotation: bool = False,
-                    title: str = None, name: str = None) -> None:
+                    title: str = None, name: str = None, save_path: str = None) -> None:
     """
     入力値を降順ソートして棒グラフを作成するメソッド
 
@@ -35,6 +37,8 @@ def plot_sorted_bar(figsize: tuple, x: list, y: np.array, xticks_rotation: bool 
         グラフタイトル文字列
     name : str
         lengthかwidthのどちらを取得するか
+    save_path : str
+        結果の保存場所を指定
     """
     # yを昇順ソート後、逆順にindexを取得
     sorted_index = np.argsort(y)[::-1]
@@ -50,7 +54,9 @@ def plot_sorted_bar(figsize: tuple, x: list, y: np.array, xticks_rotation: bool 
     if xticks_rotation:
         plt.xticks(rotation=90)
 
-    plt.savefig("../figure/bar_plot_{0}.png".format(str(name)), dpi=100, bbox_inches="tight")
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    plt.savefig(save_path + "bar_plot_{0}.png".format(str(name)), dpi=100, bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -64,11 +70,13 @@ if __name__ == "__main__":
     index = frequency.index
 
     # 可視化
+    save_path_ = "../figure/"
     plot_sorted_bar(
         figsize=(10, 5),
         x=index,
         y=frequency,
         xticks_rotation=True,
         title="Feature Importance",
-        name=label
+        name=label,
+        save_path=save_path_
     )
