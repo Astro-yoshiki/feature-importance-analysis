@@ -141,21 +141,21 @@ if __name__ == "__main__":
     result, gp = ms.gaussian_process()
     print("RMSE: ", result)
     # FIXME: 以下のコードで, 「process finished with exit code 139 (interrupted by signal 11: sigsegv)」というエラーが出る
-    # ms.visualization(model_=gp, method="GPR")
+    ms.visualization(model_=gp, method="GPR")
 
     # 勾配ブースティング
     ms = ModelSelection(path, kernel_=None)
     result, gbdt = ms.gbdt()
     print("RMSE: ", result)
-    # ms.visualization(model_=gbdt, method="GBDT")
+    ms.visualization(model_=gbdt, method="GBDT")
 
     # 一般化加法モデル
     ms = ModelSelection(path, kernel_=None)
     result, ga2m = ms.ga2m()
     print("RMSE: ", result)
-    # ms.visualization(model_=ga2m, method="GA2M")
+    ms.visualization(model_=ga2m, method="GA2M")
 
     # アンサンブル
     ms = ModelSelection(path, kernel_=None)
     model = [gp, gbdt, ga2m]
-    # ms.visualization(model_=model, method="Ensemble")
+    ms.visualization(model_=model, method="Ensemble")
