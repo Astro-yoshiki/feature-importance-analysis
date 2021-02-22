@@ -8,6 +8,7 @@ import pandas as pd
 import xgboost as xgb
 from interpret.glassbox import ExplainableBoostingRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.model_selection import train_test_split
 from sklearn.gaussian_process.kernels import ConstantKernel as C, RBF, WhiteKernel as Wh
 from sklearn.metrics import make_scorer, mean_squared_error
 from sklearn.model_selection import KFold, cross_validate
@@ -35,10 +36,14 @@ class ModelSelection:
         df = pd.read_csv(path_)
         self.x = df.iloc[:, :-1].values
         self.y = df.iloc[:, [-1]].values
+        self.x_train, self.x_test, self.y_train, self.y_test =\
+            train_test_split(self.x, self.y, test_size=0.1, random_state=0)
         self.x_sc = StandardScaler()
         self.y_sc = StandardScaler()
-        self.x_std = self.x_sc.fit_transform(self.x)
-        self.y_std = self.y_sc.fit_transform(self.y)
+        self.x_train_std = self.x_sc.fit_transform(self.x_train)
+        self.x_test_std = self.x_sc.transform(self.x_test)
+        self.y_train_std = self.y_sc.fit_transform(self.y_train)
+        self.y_test_std = self.y_sc.transform(self.y_test)
 
         self.gp = GaussianProcessRegressor(kernel=kernel_, n_restarts_optimizer=30)
         # FIXME: ここでインスタンス変数にすると, 「"XGBRegressor" object is not callable :152」と表示される...
@@ -54,12 +59,12 @@ class ModelSelection:
 
     def cross_validation(self, model_) -> float:
         """Cross Validationによるモデルの性能検証を行う関数"""
-        kf = KFold(n_splits=7, shuffle=True, random_state=0)
+        kf = KFold(n_splits=6, shuffle=True, random_state=0)
         score_funcs = {
             "rmse": make_scorer(self.rmse_score, greater_is_better=False)
         }
 
-        scores = cross_validate(model_, self.x_std, self.y_std, cv=kf, scoring=score_funcs)
+        scores = cross_validate(model_, self.x_train_std, self.y_train_std, cv=kf, scoring=score_funcs)
         mean_rmse = scores["test_rmse"].mean()
         return mean_rmse * (-1)
 
@@ -84,15 +89,15 @@ class ModelSelection:
         """予測結果の可視化を行う関数"""
         # ガウス過程回帰の場合は分散も可視化するため, 処理を分けている
         if method == "GPR":
-            y_pred_std, y_var_std = model_.predict(self.x_std, return_std=True)
+            y_pred_std, y_var_std = model_.predict(self.x_test_std, return_std=True)
             y_pred = self.y_sc.inverse_transform(y_pred_std)
             y_var = y_var_std * self.y_sc.scale_
             y_std = y_var ** 0.5
 
             fig, ax = plt.subplots(figsize=(5, 5))
-            ax.plot(self.y, y_pred, "bo")
-            ax.plot([min(self.y), max(self.y)], [min(self.y), max(self.y)], color="r")
-            ax.fill_between(self.y, y_pred.reshape(-1) - y_std, y_pred.reshape(-1) + y_std,
+            ax.plot(self.y_test, y_pred, "bo")
+            ax.plot([min(self.y_test), max(self.y_test)], [min(self.y_test), max(self.y_test)], color="r")
+            ax.fill_between(self.y_test, y_pred.reshape(-1) - y_std, y_pred.reshape(-1) + y_std,
                             alpha=0.3, color="steelblue", label="1σ")
             ax.set_xlabel("Actual")
             ax.set_ylabel("Prediction")
@@ -101,25 +106,24 @@ class ModelSelection:
         elif method == "Ensemble":
             y_pred = np.zeros((len(model_), len(self.y)))
             for i in range(len(model_)):
-                y_pred_std = model_[i].predict(self.x_std)
+                y_pred_std = model_[i].predict(self.x_test_std)
                 y_pred[i] = self.y_sc.inverse_transform(y_pred_std)
             y_pred_mean = np.mean(y_pred, axis=0)
-            print(y_pred_mean.shape)
 
             fig, ax = plt.subplots(figsize=(5, 5))
-            ax.plot(self.y, y_pred_mean, "bo")
-            ax.plot([min(self.y), max(self.y)], [min(self.y), max(self.y)], color="r")
+            ax.plot(self.y_test, y_pred_mean, "bo")
+            ax.plot([min(self.y_test), max(self.y_test)], [min(self.y_test), max(self.y_test)], color="r")
             ax.set_xlabel("Actual")
             ax.set_ylabel("Prediction")
             ax.set_title(method)
             ax.legend(loc="best")
         else:
-            y_pred_std = model_.predict(self.x_std)
+            y_pred_std = model_.predict(self.x_test_std)
             y_pred = self.y_sc.inverse_transform(y_pred_std)
 
             fig, ax = plt.subplots(figsize=(5, 5))
-            ax.plot(self.y, y_pred, "bo")
-            ax.plot([min(self.y), max(self.y)], [min(self.y), max(self.y)], color="r")
+            ax.plot(self.y_test, y_pred, "bo")
+            ax.plot([min(self.y_test), max(self.y_test)], [min(self.y_test), max(self.y_test)], color="r")
             ax.set_xlabel("Actual")
             ax.set_ylabel("Prediction")
             ax.set_title(method)
