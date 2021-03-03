@@ -65,9 +65,12 @@ if __name__ == "__main__":
         df = pd.read_csv("../data/processed_data/variable_selection_length.csv")
     elif label == "width":
         df = pd.read_csv("../data/processed_data/variable_selection_width.csv")
-    df_variable = df.iloc[:, 1:-1]
-    frequency = np.sum(df_variable, axis=0)
-    index = frequency.index
+    # RMSEを小さい順に並び替え, 上位100個を抽出
+    df_ranked = df.sort_values("RMSE", ascending=True)
+    df_ranked = df_ranked[:100]
+    df_variable = df_ranked.iloc[:, 1:-1]
+    importance = np.sum(df_variable, axis=0)
+    index = importance.index
 
     # 可視化
     save_path_ = "../figure/"
