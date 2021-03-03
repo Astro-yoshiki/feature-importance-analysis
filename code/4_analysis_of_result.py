@@ -77,7 +77,7 @@ if __name__ == "__main__":
     plot_sorted_bar(
         figsize=(10, 5),
         x=index,
-        y=frequency,
+        y=importance,
         xticks_rotation=True,
         title="Feature Importance",
         name=label,
