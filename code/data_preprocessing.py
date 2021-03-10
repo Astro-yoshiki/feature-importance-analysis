@@ -20,6 +20,7 @@ class Preprocess:
         self.x = self.df.iloc[:, :self.boundary]
         self.y = self.df.iloc[:, [self.boundary]]
         self.idx = self.df.columns[:-1].to_list()
+        self.idx += ["RMSE"]
 
         self.x_std = None
         self.y_std = None
@@ -39,8 +40,8 @@ class Preprocess:
                 result.append(list(comb))  # タプルをリスト型に変換
         print("Number of Input Combination: {}".format(len(result)))
 
-        # 空のDataFrameを作成
-        df = pd.DataFrame(np.zeros([len(result), len(self.idx)]), columns=self.idx)
+        # 予め空のDataFrameを作成
+        df = pd.DataFrame(np.zeros([len(result), len(self.idx)+1]), columns=self.idx)
         for i, comb in enumerate(result):
             if i % 1000 == 0 and i != 0:
                 print("{} Data Finished!".format(i))
