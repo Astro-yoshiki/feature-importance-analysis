@@ -127,7 +127,6 @@ class ModelSelection:
 
 
 if __name__ == "__main__":
-    # TODO: 変数選択したファイルの指定
     label = "length"
     path = "../data/processed_data/model_selection_{}.csv".format(label)
 
