@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import itertools
+import os
 
 import numpy as np
 import pandas as pd
@@ -10,16 +11,17 @@ from sklearn.preprocessing import StandardScaler
 
 class Preprocess:
     def __init__(self, data_path=None, save_path=None, boundary=None):
+        self.data_path = data_path
         if save_path is None:
             save_path = "../Data/"
-        self.data_path = data_path
+            os.mkdir(save_path)
         self.save_path = save_path
         self.boundary = boundary
 
-        self.df = pd.read_csv(self.data_path)
-        self.x = self.df.iloc[:, :self.boundary]
-        self.y = self.df.iloc[:, [self.boundary]]
-        self.idx = self.df.columns[:-1].to_list()
+        df = pd.read_csv(self.data_path)
+        self.x = df.iloc[:, :self.boundary]
+        self.y = df.iloc[:, [self.boundary]]
+        self.idx = self.x.columns.to_list()
         self.idx += ["RMSE"]
 
         self.x_std = None

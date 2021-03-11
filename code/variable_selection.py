@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 import math
+import os
 import pickle
 import time
 
@@ -19,8 +20,10 @@ class Modeling:
             cond_path = "../Data/input_combination.csv"
         if model_save_path is None:
             model_save_path = "../Model/"
+            os.mkdir(model_save_path)
         if result_path is None:
             result_path = "../Result/"
+            os.mkdir(result_path)
 
         self.cond_path = cond_path
         self.model_save_path = model_save_path

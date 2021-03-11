@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 import os
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 plt.rcParams["font.size"] = 16
 plt.rcParams["font.family"] = "sans-serif"
@@ -18,68 +21,82 @@ plt.rcParams["grid.linestyle"] = "--"
 plt.rcParams["grid.linewidth"] = 0.3
 
 
-def plot_sorted_bar(figsize: tuple, x: list, y: np.array, xticks_rotation: bool = False,
-                    title: str = None, name: str = None, save_path: str = None) -> None:
-    """
-    入力値を降順ソートして棒グラフを作成するメソッド
+class Plot:
+    def __init__(self, data_path=None, cond_path=None, save_path=None, best_model_path=None):
+        self.data_path = data_path
+        if cond_path is None:
+            cond_path = "../Data/input_combination.csv"
+        if save_path is None:
+            save_path = "../Result/"
+        if best_model_path is None:
+            best_model_path = "../Result/best_model.pickle"
 
-    Parameters
-    ----------
-    figsize : tuple
-        figsizeのtuple
-    x : list
-        横軸(ラベル)
-    y : np.numpy
-        縦軸(数値)
-    xticks_rotation : bool
-        ラベル方向
-    title : str
-        グラフタイトル文字列
-    name : str
-        lengthかwidthのどちらを取得するか
-    save_path : str
-        結果の保存場所を指定
-    """
-    # yを昇順ソート後、逆順にindexを取得
-    sorted_index = np.argsort(y)[::-1]
-    # 棒グラフの可視化
-    plt.figure(figsize=figsize)
-    plt.bar(
-        # ラベルが数値だと自動ソートされるため、x軸は文字列型にしておく
-        x[sorted_index].astype("str"),
-        np.sort(y)[::-1]
-    )
-    if title is not None:
-        plt.title(title)
-    if xticks_rotation:
-        plt.xticks(rotation=90)
+        self.cond_path = cond_path
+        self.save_path = save_path
+        self.best_model_path = best_model_path
+        self.importance = None
+        self.index = None
+        self.y_train_pred = None
+        self.y_test_pred = None
 
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-    plt.savefig(save_path + "bar_plot_{0}.png".format(str(name)), dpi=100, bbox_inches="tight")
+        df = pd.read_csv(self.data_path)
+        self.x = df.iloc[:, :-1].values
+        self.y = df.iloc[:, [-1]].values
+        self.x_train, self.x_test, self.y_train, self.y_test = \
+            train_test_split(self.x, self.y, test_size=0.1, random_state=0)
+        self.x_sc = StandardScaler()
+        self.y_sc = StandardScaler()
+        self.x_train_std = self.x_sc.fit_transform(self.x_train)
+        self.x_test_std = self.x_sc.transform(self.x_test)
+        self.y_train_std = self.y_sc.fit_transform(self.y_train)
+        self.y_test_std = self.y_sc.transform(self.y_test)
 
+    def rank_table(self, selection_ratio=1):
+        df = pd.read_csv(self.cond_path)
+        # RMSEを小さい順に並び替え, 上位1%を抽出
+        df_ranked = df.sort_values("RMSE", ascending=True)
+        df_ranked = df_ranked[:np.ceil(len(df) * selection_ratio)]
+        df_variable = df_ranked.iloc[:, :-1]
+        self.importance = np.sum(df_variable, axis=0)
+        self.index = df_variable.index
 
-if __name__ == "__main__":
-    label = "length"  # TODO: "width"の場合はここを変更
-    if label == "length":
-        df = pd.read_csv("../data/processed_data/variable_selection_length.csv")
-    elif label == "width":
-        df = pd.read_csv("../data/processed_data/variable_selection_width.csv")
-    # RMSEを小さい順に並び替え, 上位100個を抽出
-    df_ranked = df.sort_values("RMSE", ascending=True)
-    df_ranked = df_ranked[:100]
-    df_variable = df_ranked.iloc[:, 1:-1]
-    importance = np.sum(df_variable, axis=0)
-    index = importance.index
+    def predict_by_best_model(self):
+        model = pickle.load(open(self.best_model_path, "rb"))
+        y_train_pred_std = model.predict(self.x_train_std)
+        self.y_train_pred = self.y_sc.inverse_transform(y_train_pred_std)
+        y_test_pred_std = model.predict(self.x_test_std)
+        self.y_test_pred = self.y_sc.inverse_transform(y_test_pred_std)
 
-    # 可視化
-    save_path_ = "../figure/"
-    plot_sorted_bar(
-        figsize=(10, 5),
-        x=index,
-        y=importance,
-        xticks_rotation=True,
-        title="Feature Importance",
-        name=label,
-        save_path=save_path_
-    )
+    def feature_importance(self, xticks_rotation: bool = False, title: str = None):
+        # yを昇順ソート後、逆順にindexを取得
+        sorted_index = np.argsort(self.importance)[::-1]
+        # 棒グラフの可視化
+        plt.figure(figsize=(10, 5))
+        plt.bar(
+            # ラベルが数値だと自動ソートされるため、x軸は文字列型にしておく
+            self.index[sorted_index].astype("str"),
+            np.sort(self.importance)[::-1]
+        )
+        if title is not None:
+            plt.title(title)
+        if xticks_rotation:
+            plt.xticks(rotation=90)
+
+        if not os.path.exists(self.save_path):
+            os.mkdir(self.save_path)
+        plt.savefig(self.save_path + "feature_importance.png", dpi=100, bbox_inches="tight")
+        plt.close()
+
+    def parity_plot(self):
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.plot(self.y_train, self.y_train_pred, "bo", label="Train")
+        ax.plot(self.y_test, self.y_test_pred, "ro", label="Test")
+        ax.plot([min(self.y), max(self.y)], [min(self.y), max(self.y)], color="black", linestyle="dashed")
+        ax.set_xlabel("Actual")
+        ax.set_ylabel("Prediction")
+        ax.legend(loc="best")
+
+        # save plots
+        fig.tight_layout()
+        plt.savefig(self.save_path + "parity-plot.png", dpi=100)
+        plt.close()
