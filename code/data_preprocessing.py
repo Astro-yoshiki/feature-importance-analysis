@@ -10,19 +10,18 @@ from sklearn.preprocessing import StandardScaler
 
 
 class Preprocess:
-    def __init__(self, data_path=None, save_path=None, boundary=None):
+    def __init__(self, data_path=None, save_path=None):
         self.data_path = data_path
         if save_path is None:
             save_path = "../Data/"
-            os.mkdir(save_path)
+            if not os.path.exists(save_path):
+                os.mkdir(save_path)
         self.save_path = save_path
-        self.boundary = boundary
 
         df = pd.read_csv(self.data_path)
-        self.x = df.iloc[:, :self.boundary]
-        self.y = df.iloc[:, [self.boundary]]
+        self.x = df.iloc[:, :-1]
+        self.y = df.iloc[:, [-1]]
         self.idx = self.x.columns.to_list()
-        self.idx += ["RMSE"]
 
         self.x_std = None
         self.y_std = None
@@ -43,7 +42,7 @@ class Preprocess:
         print("Number of Input Combination: {}".format(len(result)))
 
         # 予め空のDataFrameを作成
-        df = pd.DataFrame(np.zeros([len(result), len(self.idx)+1]), columns=self.idx)
+        df = pd.DataFrame(np.zeros([len(result), len(self.idx)]), columns=self.idx)
         for i, comb in enumerate(result):
             if i % 1000 == 0 and i != 0:
                 print("{} Data Finished!".format(i))
@@ -52,4 +51,5 @@ class Preprocess:
             for item in comb:
                 if item in self.idx:
                     df[item][i] = 1.
-        df.to_csv(self.save_path + "input_combination.csv", encoding="utf-8")
+        df["RMSE"] = 0  # RMSEの行を追加
+        df.to_csv(self.save_path + "input_combination.csv", index=False, encoding="utf-8")

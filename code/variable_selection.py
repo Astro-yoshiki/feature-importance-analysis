@@ -20,10 +20,12 @@ class Modeling:
             cond_path = "../Data/input_combination.csv"
         if model_save_path is None:
             model_save_path = "../Model/"
-            os.mkdir(model_save_path)
+            if not os.path.exists(model_save_path):
+                os.mkdir(model_save_path)
         if result_path is None:
             result_path = "../Result/"
-            os.mkdir(result_path)
+            if not os.path.exists(result_path):
+                os.mkdir(result_path)
 
         self.cond_path = cond_path
         self.model_save_path = model_save_path
@@ -46,13 +48,14 @@ class Modeling:
         idx_not_zero_list = idx_not_zero.to_list()
         return idx_not_zero_list
 
-    def build_model(self, model_id, params_, result_, save_all_models=False, return_best=False):
+    def build_model(self, model_id, params_, result_, save_all_models=False, save_table=False, return_best=False):
         # データの読み込みと抽出
         df = pd.read_csv(self.data_path)
         x = pd.DataFrame(np.zeros((len(df), len(params_))), columns=params_)
         for param in params_:
             x[param] = df[param].values
         y = df.iloc[:, [-1]].values
+        y_idx = df.columns[-1]
 
         # 正規化
         x_sc = StandardScaler()
@@ -85,25 +88,28 @@ class Modeling:
             pickle.dump(model, open("{0}xgb_model_{1}.pickle".format(self.model_save_path, str(model_id)), "wb"))
         if return_best:
             pickle.dump(model, open("{}best_model.pickle".format(self.result_path), "wb"))
-        else:
-            pass
+        if save_table:
+            stacked_data = np.hstack([x, y])
+            columns = params_ + [y_idx]
+            df = pd.DataFrame(stacked_data, columns=columns, index=None)
+            df.to_csv("../Data/selected_data.csv", index=False, encoding="utf-8")
 
     def solver(self):
-        df_result = pd.read_csv(self.cond_path)
+        self.df_result = pd.read_csv(self.cond_path)
         result = []
-        num = len(df_result)
+        num = 10  # TODO: num = len(df_result)に変更
         start_time = time.time()
 
         # モデル評価開始
         for i in range(num):
             params = self.choose_input(i)
-            self.build_model(i, params_=params, result_=result, save_all_models=False, return_best=False)
+            self.build_model(i, params_=params, result_=result, save_all_models=True, return_best=False)
             if i % 1000 == 0 and i != 0:
                 print("{}th Modeling Finished!".format(i))
-            if i == len(df_result) - 1:
+            if i == len(self.df_result) - 1:
                 print("Modeling Completed!")
         self.df_result.iloc[:num, -1] = result
-        self.df_result.to_csv(self.cond_path, encoding="utf-8")
+        self.df_result.to_csv(self.cond_path, index=False, encoding="utf-8")
 
         # 経過時間の表示
         end_time = time.time()
@@ -113,4 +119,5 @@ class Modeling:
     def save_best_model(self):
         best_model_idx = np.argmin(self.df_result["RMSE"])
         params = self.choose_input(best_model_idx)
-        self.build_model(best_model_idx, params_=params, result_=[], save_all_models=False, return_best=True)
+        self.build_model(best_model_idx, params_=params, result_=[],
+                         save_all_models=False, save_table=True, return_best=True)

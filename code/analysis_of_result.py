@@ -51,14 +51,15 @@ class Plot:
         self.y_train_std = self.y_sc.fit_transform(self.y_train)
         self.y_test_std = self.y_sc.transform(self.y_test)
 
-    def rank_table(self, selection_ratio=1):
+    def rank_table(self, selection_ratio=0.001):
         df = pd.read_csv(self.cond_path)
         # RMSEを小さい順に並び替え, 上位1%を抽出
         df_ranked = df.sort_values("RMSE", ascending=True)
-        df_ranked = df_ranked[:np.ceil(len(df) * selection_ratio)]
+        slice_idx = int(np.ceil(len(df) * selection_ratio))
+        df_ranked = df_ranked[:slice_idx]
         df_variable = df_ranked.iloc[:, :-1]
         self.importance = np.sum(df_variable, axis=0)
-        self.index = df_variable.index
+        self.index = df_variable.columns
 
     def predict_by_best_model(self):
         model = pickle.load(open(self.best_model_path, "rb"))
@@ -67,7 +68,7 @@ class Plot:
         y_test_pred_std = model.predict(self.x_test_std)
         self.y_test_pred = self.y_sc.inverse_transform(y_test_pred_std)
 
-    def feature_importance(self, xticks_rotation: bool = False, title: str = None):
+    def feature_importance(self, xticks_rotation: bool = True, title: str = None):
         # yを昇順ソート後、逆順にindexを取得
         sorted_index = np.argsort(self.importance)[::-1]
         # 棒グラフの可視化
