@@ -1,24 +1,25 @@
-from data_preprocessing import Preprocess
-from variable_selection import Modeling
-from analysis_of_result import Plot
+from preprocessing import Preprocessor
+from selection import Modeling
+from analysis import Plot
 
 if __name__ == "__main__":
-    # データの前処理
+    verbose = 1
+    # Part of Data preprocessing
     print("***** Preprocessing Start *****")
     data_path = "../Data/master_data.csv"
-    preprocessor = Preprocess(data_path)
-    preprocessor.scaling()
-    preprocessor.input_combination()
+    preprocessor = Preprocessor(data_path)
+    preprocessor.read_data()
+    preprocessor.input_combination(verbose=verbose)
     print("***** Preprocessing Finished *****")
 
-    # 異なる入力パラメータで訓練
+    # Part of creating models
     print("***** Modeling Start *****")
     modeling = Modeling(data_path=data_path)
-    modeling.solver()
+    modeling.solver(verbose=verbose)
     modeling.save_best_model()
     print("***** Modeling Finished *****")
 
-    # parity-plotと予測結果の可視化
+    # Part of visualizing the results
     print("***** Visualization Start *****")
     model_data_path = "../Data/selected_data.csv"
     plot = Plot(data_path=model_data_path)
